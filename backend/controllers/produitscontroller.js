@@ -36,3 +36,74 @@ exports.creer = async (req, res) => {
     res.status(500).json({ erreur: 'Erreur serveur' });
   }
 };
+
+// POST /api/produits/:id/vente (admin) : « Vente conclue », décrémente le stock
+exports.enregistrerVente = async (req, res) => {
+  const quantite = parseInt(req.body.quantite ?? 1, 10);
+  if (!Number.isInteger(quantite) || quantite < 1) {
+    return res.status(400).json({ erreur: 'Quantité invalide' });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `UPDATE produits
+       SET stock = stock - $1, updated_at = NOW()
+       WHERE id = $2 AND stock >= $1
+       RETURNING *, (stock <= seuil_alerte) AS stock_faible`,
+      [quantite, req.params.id]
+    );
+    if (rows.length === 0) {
+      return res.status(409).json({ erreur: 'Produit introuvable ou stock insuffisant' });
+    }
+    res.json(rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ erreur: 'Erreur serveur' });
+  }
+};
+
+// PUT /api/produits/:id (admin) : modifie seulement les champs envoyés
+exports.modifier = async (req, res) => {
+  const autorises = ['nom', 'description', 'prix', 'stock', 'seuil_alerte', 'image_url', 'categorie', 'actif'];
+  const champs = Object.keys(req.body).filter((champ) => autorises.includes(champ));
+
+  if (champs.length === 0) {
+    return res.status(400).json({ erreur: 'Aucun champ valide à modifier' });
+  }
+
+  const affectations = champs.map((champ, i) => `${champ} = $${i + 1}`).join(', ');
+  const valeurs = champs.map((champ) => req.body[champ]);
+
+  try {
+    const { rows } = await pool.query(
+      `UPDATE produits
+       SET ${affectations}, updated_at = NOW()
+       WHERE id = $${champs.length + 1}
+       RETURNING *`,
+      [...valeurs, req.params.id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ erreur: 'Produit introuvable' });
+    }
+    res.json(rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ erreur: 'Erreur serveur' });
+  }
+};
+
+// DELETE /api/produits/:id (admin) : suppression définitive
+exports.supprimer = async (req, res) => {
+  try {
+    const { rowCount } = await pool.query('DELETE FROM produits WHERE id = $1', [req.params.id]);
+
+    if (rowCount === 0) {
+      return res.status(404).json({ erreur: 'Produit introuvable' });
+    }
+    res.status(204).end();
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ erreur: 'Erreur serveur' });
+  }
+};
