@@ -1,2 +1,27 @@
+# Dépendances Node.js
 node_modules/
+
+# Variables d'environnement et informations sensibles
 .env
+.env.*
+!.env.example
+
+# Fichiers de logs
+logs/
+*.log
+npm-debug.log*
+
+# Fichiers temporaires et sauvegardes
+temp/
+tmp/
+*.tmp
+*.bak
+
+# Fichiers système
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Configuration locale des éditeurs
+.vscode/
+.idea/
